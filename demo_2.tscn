@@ -1,0 +1,65 @@
+[gd_scene load_steps=12 format=3 uid="uid://cir6j2ggj1odh"]
+
+[ext_resource type="Texture2D" uid="uid://detsilp12nioo" path="res://addons/compositor-lens-flare/lens-dirt.png" id="1_kvksr"]
+[ext_resource type="CompositorEffect" uid="uid://cpnwkm1swg8u0" path="res://addons/compositor-lens-flare/lens_flare_compositor_effect.tres" id="1_s5a1l"]
+
+[sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_7lb6p"]
+
+[sub_resource type="Sky" id="Sky_s5a1l"]
+sky_material = SubResource("PhysicalSkyMaterial_7lb6p")
+
+[sub_resource type="Environment" id="Environment_kvksr"]
+background_mode = 2
+sky = SubResource("Sky_s5a1l")
+tonemap_mode = 4
+ssao_enabled = true
+sdfgi_enabled = true
+glow_enabled = true
+glow_bloom = 1.0
+glow_blend_mode = 1
+glow_map_strength = 0.2
+glow_map = ExtResource("1_kvksr")
+fog_enabled = true
+fog_sun_scatter = 0.2
+fog_aerial_perspective = 0.862
+
+[sub_resource type="CameraAttributesPhysical" id="CameraAttributesPhysical_4kb6d"]
+exposure_sensitivity = 800.0
+
+[sub_resource type="Compositor" id="Compositor_4kb6d"]
+compositor_effects = Array[CompositorEffect]([ExtResource("1_s5a1l")])
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uxutw"]
+albedo_color = Color(0, 0, 0, 1)
+emission_enabled = true
+emission = Color(0.6, 0.29411766, 0.85882354, 1)
+emission_intensity = 5000.0
+
+[sub_resource type="BoxMesh" id="BoxMesh_uxutw"]
+size = Vector3(1, 2, 0.25)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kvksr"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_4kb6d"]
+size = Vector2(5000, 5000)
+
+[node name="Demo2" type="Node3D"]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.99999857, 0.0017453285, 0, -0.0017453285, 0.99999857, 0, 0, 0)
+light_intensity_lux = 5000.0
+light_bake_mode = 1
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_kvksr")
+camera_attributes = SubResource("CameraAttributesPhysical_4kb6d")
+compositor = SubResource("Compositor_4kb6d")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("StandardMaterial3D_uxutw")
+mesh = SubResource("BoxMesh_uxutw")
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
+material_override = SubResource("StandardMaterial3D_kvksr")
+mesh = SubResource("PlaneMesh_4kb6d")

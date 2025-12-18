@@ -1,0 +1,61 @@
+[gd_scene load_steps=14 format=3 uid="uid://dfupefrhdp487"]
+
+[ext_resource type="CompositorEffect" uid="uid://cpnwkm1swg8u0" path="res://addons/compositor-lens-flare/lens_flare_compositor_effect.tres" id="1_5hfv0"]
+[ext_resource type="Texture2D" uid="uid://detsilp12nioo" path="res://addons/compositor-lens-flare/lens-dirt.png" id="1_gxmxl"]
+[ext_resource type="Texture2D" uid="uid://fvxyx22tlp1r" path="res://Resources/Concrete/concrete_wall_007_diff_4k.jpg" id="2_kem5a"]
+[ext_resource type="Texture2D" uid="uid://ccij0mqknto8m" path="res://Resources/Concrete/concrete_wall_007_ao_4k.jpg" id="3_gxmxl"]
+[ext_resource type="Texture2D" uid="uid://xdqfifb4c51g" path="res://Resources/Concrete/concrete_wall_007_nor_gl_4k.png" id="4_n4w22"]
+[ext_resource type="Texture2D" uid="uid://b2aqbyf5js52x" path="res://Resources/Concrete/concrete_wall_007_rough_4k.png" id="5_884kg"]
+[ext_resource type="ArrayMesh" uid="uid://cals0eudw6xpn" path="res://Resources/Scene/scene.res" id="6_d4o4o"]
+
+[sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_0bhed"]
+mie_eccentricity = 0.95
+ground_color = Color(1, 1, 1, 1)
+energy_multiplier = 2.0
+
+[sub_resource type="Sky" id="Sky_m0rpm"]
+sky_material = SubResource("PhysicalSkyMaterial_0bhed")
+
+[sub_resource type="Environment" id="Environment_c6xj6"]
+background_mode = 2
+sky = SubResource("Sky_m0rpm")
+tonemap_mode = 4
+glow_enabled = true
+glow_blend_mode = 1
+glow_map = ExtResource("1_gxmxl")
+adjustment_enabled = true
+adjustment_contrast = 1.3
+adjustment_saturation = 1.3
+
+[sub_resource type="CameraAttributesPhysical" id="CameraAttributesPhysical_kem5a"]
+auto_exposure_enabled = true
+auto_exposure_speed = 2.0
+
+[sub_resource type="Compositor" id="Compositor_6bw2v"]
+compositor_effects = Array[CompositorEffect]([ExtResource("1_5hfv0")])
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gdsc3"]
+albedo_texture = ExtResource("2_kem5a")
+roughness_texture = ExtResource("5_884kg")
+normal_enabled = true
+normal_texture = ExtResource("4_n4w22")
+ao_enabled = true
+ao_texture = ExtResource("3_gxmxl")
+uv1_scale = Vector3(0.5, 0.5, 0.5)
+uv1_triplanar = true
+
+[node name="Node3D" type="Node3D"]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.23344539, -0.44144672, 0.86638796, 0, 0.8910065, 0.45399052, -0.9723699, 0.10598199, -0.20800136, 0, 0, 0)
+light_intensity_lux = 120000.0
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_c6xj6")
+camera_attributes = SubResource("CameraAttributesPhysical_kem5a")
+compositor = SubResource("Compositor_6bw2v")
+
+[node name="Scene" type="MeshInstance3D" parent="."]
+material_override = SubResource("StandardMaterial3D_gdsc3")
+mesh = ExtResource("6_d4o4o")
