@@ -13,12 +13,18 @@ var downsample_shader_file = load("res://addons/compositor-lens-flare/downsample
 var lens_shader_file = load("res://addons/compositor-lens-flare/lens.glsl")
 var blur_shader_file = load("res://addons/compositor-lens-flare/gaussian_blur.glsl")
 var overlay_shader_file = load("res://addons/compositor-lens-flare/overlay.glsl")
+var streak_shader_file = load("res://addons/compositor-lens-flare/streak.glsl")
 
 @export_group("Guassian Blur", "gaussian_blur_")
 @export_range(5.0, 50.0) var gaussian_blur_size: float = 32.0
 
+@export_group("Glare", "glare_")
+@export_range(0.8, 1.0) var glare_attenuation: float = 0.98
+@export_range(1, 12) var glare_samples: int = 4
+
 @export var lens_flare_color_ramp: Texture2D
 @export var lens_dirt: Texture2D
+@export var default_overlay_texture: Texture2D
 
 var downsample_shader: RID
 var downsample_pipeline: RID
@@ -31,6 +37,9 @@ var blur_pipeline: RID
 
 var overlay_shader: RID
 var overlay_pipeline: RID
+
+var streak_shader: RID
+var streak_pipeline: RID
 
 var rd: RenderingDevice
 
@@ -117,6 +126,18 @@ func _initialize_compute():
 		return false
 
 	overlay_pipeline = rd.compute_pipeline_create(overlay_shader)
+	
+	var streak_shader_spirv: RDShaderSPIRV = streak_shader_file.get_spirv()
+
+	if streak_shader_spirv.compile_error_compute != "":
+		push_error(streak_shader_spirv.compile_error_compute)
+		return false
+
+	streak_shader = rd.shader_create_from_spirv(streak_shader_spirv)
+	if not streak_shader.is_valid():
+		return false
+
+	streak_pipeline = rd.compute_pipeline_create(streak_shader)
 
 
 # Check if our shader has changed and needs to be recompiled.
@@ -199,7 +220,29 @@ func _render_callback(p_effect_callback_type, p_render_data):
 				var input_image = render_scene_buffers.get_color_layer(view)
 				
 				var usage_bits : int = RenderingDevice.TEXTURE_USAGE_SAMPLING_BIT | RenderingDevice.TEXTURE_USAGE_STORAGE_BIT
-				# Create downsample texture
+				
+				# Create textures
+				render_scene_buffers.create_texture(
+					context, 
+					"Downsampled", 
+					RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT, 
+					usage_bits, 
+					RenderingDevice.TEXTURE_SAMPLES_1, 
+					size, 1, 1, true, false)
+				render_scene_buffers.create_texture(
+					context, 
+					"BlurLeft", 
+					RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT, 
+					usage_bits, 
+					RenderingDevice.TEXTURE_SAMPLES_1, 
+					size, 1, 1, true, false)
+				render_scene_buffers.create_texture(
+					context, 
+					"BlurRight", 
+					RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT, 
+					usage_bits, 
+					RenderingDevice.TEXTURE_SAMPLES_1, 
+					size, 1, 1, true, false)
 				render_scene_buffers.create_texture(
 					context, 
 					"Ping", 
@@ -220,11 +263,14 @@ func _render_callback(p_effect_callback_type, p_render_data):
 				color_uniform.binding = 0
 				color_uniform.add_id(input_image)
 				
+				var downsampled_uniform = get_image_uniform(render_scene_buffers.get_texture(context, "Downsampled"))
 				var ping_uniform = get_image_uniform(render_scene_buffers.get_texture(context, "Ping"))
 				var pong_uniform = get_image_uniform(render_scene_buffers.get_texture(context, "Pong"))
+				var blur_left_uniform = get_image_uniform(render_scene_buffers.get_texture(context, "BlurLeft"))
+				var blur_right_uniform = get_image_uniform(render_scene_buffers.get_texture(context, "BlurRigt"))
 				
 				var color_uniform_set := UniformSetCacheRD.get_cache(lens_shader, 0, [ color_uniform ])
-				var ping_uniform_set := UniformSetCacheRD.get_cache(lens_shader, 1, [ping_uniform])
+				var ping_uniform_set := UniformSetCacheRD.get_cache(lens_shader, 1, [ downsampled_uniform ])
 				
 				# Downsample
 				var compute_list := rd.compute_list_begin()
@@ -234,18 +280,120 @@ func _render_callback(p_effect_callback_type, p_render_data):
 				rd.compute_list_set_push_constant(compute_list, push_constant.to_byte_array(), push_constant.size() * 4)
 				rd.compute_list_dispatch(compute_list, x_groups, y_groups, z_groups)
 				rd.compute_list_end()
-
-				## Create a uniform set.
-				## This will be cached; the cache will be cleared if our viewport's configuration is changed.
-				#var uniform: RDUniform = RDUniform.new()
-				#uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
-				#uniform.binding = 0
-				#uniform.add_id(input_image)
-				#var uniform_set = UniformSetCacheRD.get_cache(lens_shader, 0, [ uniform ])
+				
+				# Light streak
+				for angle in [0., 60., 120., 180., 240., 300.]:
+					var direction = Vector2(1.0, 0.0).rotated(deg_to_rad(angle))
+					
+					var streak_push_constant: PackedByteArray = PackedByteArray()
+					streak_push_constant.resize(32)
+					streak_push_constant.encode_float(0, size.x)
+					streak_push_constant.encode_float(4, size.y)
+					streak_push_constant.encode_float(8, direction.x * 1.0) # Direction
+					streak_push_constant.encode_float(12, direction.y * 1.0)
+					streak_push_constant.encode_s32(16, glare_samples) # Samples
+					streak_push_constant.encode_float(20, glare_attenuation) # Attenuation
+					streak_push_constant.encode_s32(24, 0) # Iteration
+					
+					var streak_uniform_set
+					var streak_uniform_set2
+					
+					streak_uniform_set = UniformSetCacheRD.get_cache(streak_shader, 0, [downsampled_uniform])
+					streak_uniform_set2 = UniformSetCacheRD.get_cache(streak_shader, 1, [ping_uniform])
+						
+					compute_list = rd.compute_list_begin()
+					rd.compute_list_bind_compute_pipeline(compute_list, streak_pipeline)
+					rd.compute_list_bind_uniform_set(compute_list, streak_uniform_set, 0)
+					rd.compute_list_bind_uniform_set(compute_list, streak_uniform_set2, 1)
+					rd.compute_list_set_push_constant(compute_list, streak_push_constant, streak_push_constant.size())
+					rd.compute_list_dispatch(compute_list, x_groups, y_groups, z_groups)
+					rd.compute_list_end()
+					
+					# Iteration 2
+					streak_push_constant = PackedByteArray()
+					streak_push_constant.resize(32)
+					streak_push_constant.encode_float(0, size.x)
+					streak_push_constant.encode_float(4, size.y)
+					streak_push_constant.encode_float(8, direction.x * 1.0) # Direction
+					streak_push_constant.encode_float(12, direction.y * 1.0)
+					streak_push_constant.encode_s32(16, glare_samples) # Samples
+					streak_push_constant.encode_float(20, glare_attenuation) # Attenuation
+					streak_push_constant.encode_s32(24, 1) # Iteration
+					
+					streak_uniform_set = UniformSetCacheRD.get_cache(streak_shader, 0, [ping_uniform])
+					streak_uniform_set2 = UniformSetCacheRD.get_cache(streak_shader, 1, [pong_uniform])
+						
+					compute_list = rd.compute_list_begin()
+					rd.compute_list_bind_compute_pipeline(compute_list, streak_pipeline)
+					rd.compute_list_bind_uniform_set(compute_list, streak_uniform_set, 0)
+					rd.compute_list_bind_uniform_set(compute_list, streak_uniform_set2, 1)
+					rd.compute_list_set_push_constant(compute_list, streak_push_constant, streak_push_constant.size())
+					rd.compute_list_dispatch(compute_list, x_groups, y_groups, z_groups)
+					rd.compute_list_end()
+					
+					# Iteration 3
+					streak_push_constant = PackedByteArray()
+					streak_push_constant.resize(32)
+					streak_push_constant.encode_float(0, size.x)
+					streak_push_constant.encode_float(4, size.y)
+					streak_push_constant.encode_float(8, direction.x * 1.0) # Direction
+					streak_push_constant.encode_float(12, direction.y * 1.0)
+					streak_push_constant.encode_s32(16, glare_samples) # Samples
+					streak_push_constant.encode_float(20, glare_attenuation) # Attenuation
+					streak_push_constant.encode_s32(24, 2) # Iteration
+					
+					streak_uniform_set = UniformSetCacheRD.get_cache(streak_shader, 0, [pong_uniform])
+					streak_uniform_set2 = UniformSetCacheRD.get_cache(streak_shader, 1, [ping_uniform])
+						
+					compute_list = rd.compute_list_begin()
+					rd.compute_list_bind_compute_pipeline(compute_list, streak_pipeline)
+					rd.compute_list_bind_uniform_set(compute_list, streak_uniform_set, 0)
+					rd.compute_list_bind_uniform_set(compute_list, streak_uniform_set2, 1)
+					rd.compute_list_set_push_constant(compute_list, streak_push_constant, streak_push_constant.size())
+					rd.compute_list_dispatch(compute_list, x_groups, y_groups, z_groups)
+					rd.compute_list_end()
+					
+					# Iteration 4
+					streak_push_constant = PackedByteArray()
+					streak_push_constant.resize(32)
+					streak_push_constant.encode_float(0, size.x)
+					streak_push_constant.encode_float(4, size.y)
+					streak_push_constant.encode_float(8, direction.x * 1.0) # Direction
+					streak_push_constant.encode_float(12, direction.y * 1.0)
+					streak_push_constant.encode_s32(16, glare_samples) # Samples
+					streak_push_constant.encode_float(20, glare_attenuation) # Attenuation
+					streak_push_constant.encode_s32(24, 3) # Iteration
+					
+					streak_uniform_set = UniformSetCacheRD.get_cache(streak_shader, 0, [ping_uniform])
+					streak_uniform_set2 = UniformSetCacheRD.get_cache(streak_shader, 1, [pong_uniform])
+						
+					compute_list = rd.compute_list_begin()
+					rd.compute_list_bind_compute_pipeline(compute_list, streak_pipeline)
+					rd.compute_list_bind_uniform_set(compute_list, streak_uniform_set, 0)
+					rd.compute_list_bind_uniform_set(compute_list, streak_uniform_set2, 1)
+					rd.compute_list_set_push_constant(compute_list, streak_push_constant, streak_push_constant.size())
+					rd.compute_list_dispatch(compute_list, x_groups, y_groups, z_groups)
+					rd.compute_list_end()
+					
+					# Blur onto color
+					var overlay_uniform = get_texture_uniform(default_overlay_texture)
+					
+					var overlay_uniform_set_1 = UniformSetCacheRD.get_cache(overlay_shader, 0, [ pong_uniform ])
+					var overlay_uniform_set_2 = UniformSetCacheRD.get_cache(overlay_shader, 1, [ color_uniform ])
+					var overlay_uniform_set_3 = UniformSetCacheRD.get_cache(overlay_shader, 2, [ overlay_uniform ])
+					
+					compute_list = rd.compute_list_begin()
+					rd.compute_list_bind_compute_pipeline(compute_list, overlay_pipeline)
+					rd.compute_list_bind_uniform_set(compute_list, overlay_uniform_set_1, 0)
+					rd.compute_list_bind_uniform_set(compute_list, overlay_uniform_set_2, 1)
+					rd.compute_list_bind_uniform_set(compute_list, overlay_uniform_set_3, 2)
+					rd.compute_list_set_push_constant(compute_list, push_constant.to_byte_array(), push_constant.size() * 4)
+					rd.compute_list_dispatch(compute_list, x_groups, y_groups, 1)
+					rd.compute_list_end()
 				
 				var color_ramp_uniform = get_texture_uniform(lens_flare_color_ramp)
 				
-				ping_uniform_set = UniformSetCacheRD.get_cache(lens_shader, 0, [ ping_uniform ])
+				ping_uniform_set = UniformSetCacheRD.get_cache(lens_shader, 0, [ downsampled_uniform ])
 				var pong_uniform_set = UniformSetCacheRD.get_cache(lens_shader, 1, [pong_uniform])
 				var color_ramp_uniform_set = UniformSetCacheRD.get_cache(lens_shader, 2, [color_ramp_uniform])
 

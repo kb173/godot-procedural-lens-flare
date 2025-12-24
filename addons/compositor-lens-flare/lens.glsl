@@ -46,8 +46,8 @@ void main() {
     vec2 uv_norm = uv / resolution;
     vec2 texcoord = vec2(1.0) - uv_norm;
 
-    int uGhosts = 4;
-    float uGhostDispersal = 0.4;
+    int uGhosts = 8;
+    float uGhostDispersal = 0.25;
 
     vec2 ghostVec = (vec2(0.5) - texcoord) * uGhostDispersal;
 
@@ -59,9 +59,9 @@ void main() {
         vec2 offset = fract(texcoord + ghostVec * float(i));
 
         float weight = length(vec2(0.5) - offset) / length(vec2(0.5));
-        weight = pow(1.0 - weight, 5.0);
+        weight = pow(1.0 - weight, 2.0);
 
-        result += imageDistorted(ivec2(offset * resolution), direction, distortion).rgb * weight;
+        result += imageDistorted(ivec2(offset * resolution), direction, distortion).rgb * (1.0 / weight);
     }
 
     float uHaloWidth = 0.4;

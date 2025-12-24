@@ -9,27 +9,32 @@
 [ext_resource type="ArrayMesh" uid="uid://cals0eudw6xpn" path="res://Resources/Scene/scene.res" id="6_d4o4o"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_0bhed"]
-mie_eccentricity = 0.95
+rayleigh_coefficient = 1.0
+mie_coefficient = 0.001
+mie_eccentricity = 0.99
+turbidity = 0.2
 ground_color = Color(1, 1, 1, 1)
-energy_multiplier = 2.0
 
 [sub_resource type="Sky" id="Sky_m0rpm"]
 sky_material = SubResource("PhysicalSkyMaterial_0bhed")
 
 [sub_resource type="Environment" id="Environment_c6xj6"]
 background_mode = 2
+background_intensity = 36319.7
 sky = SubResource("Sky_m0rpm")
 tonemap_mode = 4
 glow_enabled = true
+glow_strength = 1.2
 glow_blend_mode = 1
 glow_map = ExtResource("1_gxmxl")
 adjustment_enabled = true
 adjustment_contrast = 1.3
-adjustment_saturation = 1.3
+adjustment_saturation = 1.6
 
 [sub_resource type="CameraAttributesPhysical" id="CameraAttributesPhysical_kem5a"]
 auto_exposure_enabled = true
-auto_exposure_speed = 2.0
+auto_exposure_scale = 0.6
+auto_exposure_speed = 32.0
 
 [sub_resource type="Compositor" id="Compositor_6bw2v"]
 compositor_effects = Array[CompositorEffect]([ExtResource("1_5hfv0")])
