@@ -63,6 +63,8 @@ var rd: RenderingDevice
 var mutex: Mutex = Mutex.new()
 var shader_is_dirty: bool = true
 
+var clamp_linear_texture_sampler: RID
+
 # Called when this resource is constructed.
 func _init():
 	effect_callback_type = EFFECT_CALLBACK_TYPE_POST_TRANSPARENT
@@ -97,6 +99,9 @@ func reload():
 
 func _initialize_compute():
 	rd = RenderingServer.get_rendering_device()
+	
+	# Create samplers
+	clamp_linear_texture_sampler = create_texture_sampler()
 	
 	# Compile all shaders and create pipelines
 	
@@ -191,7 +196,7 @@ func get_image_uniform(image : RID, binding : int = 0) -> RDUniform:
 	return uniform
 
 
-func get_texture_uniform(texture: Texture, binding : int = 0) -> RDUniform:
+func create_texture_sampler():
 	var sampler_state = RDSamplerState.new()
 	sampler_state.repeat_u = RenderingDevice.SAMPLER_REPEAT_MODE_CLAMP_TO_EDGE
 	sampler_state.repeat_v = RenderingDevice.SAMPLER_REPEAT_MODE_CLAMP_TO_EDGE
@@ -200,12 +205,14 @@ func get_texture_uniform(texture: Texture, binding : int = 0) -> RDUniform:
 	sampler_state.min_filter = RenderingDevice.SAMPLER_FILTER_LINEAR
 	sampler_state.mip_filter = RenderingDevice.SAMPLER_FILTER_LINEAR
 	
-	var texture_sampler = rd.sampler_create(sampler_state)
-	
+	return rd.sampler_create(sampler_state)
+
+
+func get_texture_uniform(texture: Texture, binding : int = 0) -> RDUniform:
 	var uniform : RDUniform = RDUniform.new()
 	uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE
 	uniform.binding = binding
-	uniform.add_id(texture_sampler)
+	uniform.add_id(clamp_linear_texture_sampler)
 	uniform.add_id(RenderingServer.texture_get_rd_texture(texture.get_rid(), true))
 
 	return uniform
