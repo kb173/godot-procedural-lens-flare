@@ -1,7 +1,8 @@
-[gd_scene load_steps=12 format=3 uid="uid://cir6j2ggj1odh"]
+[gd_scene load_steps=16 format=3 uid="uid://cir6j2ggj1odh"]
 
 [ext_resource type="Texture2D" uid="uid://detsilp12nioo" path="res://addons/compositor-lens-flare/lens-dirt.png" id="1_kvksr"]
-[ext_resource type="CompositorEffect" uid="uid://cpnwkm1swg8u0" path="res://addons/compositor-lens-flare/lens_flare_compositor_effect.tres" id="1_s5a1l"]
+[ext_resource type="Texture2D" uid="uid://dawnxeg62rkll" path="res://addons/compositor-lens-flare/lens_color_ramp.tres" id="2_4kb6d"]
+[ext_resource type="Script" uid="uid://0dlqdm6ci0xm" path="res://addons/compositor-lens-flare/post_process_shader.gd" id="3_uxutw"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_7lb6p"]
 
@@ -26,8 +27,36 @@ fog_aerial_perspective = 0.862
 [sub_resource type="CameraAttributesPhysical" id="CameraAttributesPhysical_4kb6d"]
 exposure_sensitivity = 800.0
 
+[sub_resource type="Gradient" id="Gradient_v4on2"]
+offsets = PackedFloat32Array(0)
+colors = PackedColorArray(1, 1, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_wwdrl"]
+gradient = SubResource("Gradient_v4on2")
+width = 1
+
+[sub_resource type="CompositorEffect" id="CompositorEffect_rodxm"]
+resource_local_to_scene = false
+resource_name = ""
+enabled = true
+effect_callback_type = 4
+needs_motion_vectors = false
+needs_normal_roughness = false
+script = ExtResource("3_uxutw")
+downsample_scale = 0.25
+downsample_bias = 0.75
+downsample_desaturation = 0.3
+glare_streak_count = 2
+glare_attenuation = 0.9500000000000001
+flare_color_ramp = ExtResource("2_4kb6d")
+gaussian_blur_size = 32.0
+overlay_dirt_texture = ExtResource("1_kvksr")
+overlay_white_texture = SubResource("GradientTexture1D_wwdrl")
+overlay_dirt_texture_power = 0.8
+metadata/_custom_type_script = "uid://0dlqdm6ci0xm"
+
 [sub_resource type="Compositor" id="Compositor_4kb6d"]
-compositor_effects = Array[CompositorEffect]([ExtResource("1_s5a1l")])
+compositor_effects = Array[CompositorEffect]([SubResource("CompositorEffect_rodxm")])
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uxutw"]
 albedo_color = Color(0, 0, 0, 1)

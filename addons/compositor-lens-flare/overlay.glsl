@@ -11,7 +11,8 @@ layout(set = 2, binding = 0) uniform sampler2D dirt_texture;
 // Our push PushConstant
 layout(push_constant, std430) uniform Params {
     vec2 render_size;
-    vec2 res;
+    float res;
+    float dirt_power;
 } params;
 
 // The code we want to execute in each invocation
@@ -28,7 +29,7 @@ void main() {
     float dirt = texture(dirt_texture, vec2(uv) / vec2(render_size)).r;
 
     vec4 color = imageLoad(color_image, uv);
-    vec4 overlay = imageLoad(overlay_image, uv) * mix(1.0, dirt, 0.6);
+    vec4 overlay = imageLoad(overlay_image, uv) * mix(1.0, dirt, params.dirt_power);
 
     color += overlay;
 
