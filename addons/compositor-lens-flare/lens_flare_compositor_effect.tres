@@ -1,4 +1,4 @@
-[gd_resource type="CompositorEffect" script_class="PostProcessShader" load_steps=6 format=3 uid="uid://cpnwkm1swg8u0"]
+[gd_resource type="CompositorEffect" script_class="PostProcessShader" format=3 uid="uid://cpnwkm1swg8u0"]
 
 [ext_resource type="Texture2D" uid="uid://dawnxeg62rkll" path="res://addons/compositor-lens-flare/lens_color_ramp.tres" id="1_1jo43"]
 [ext_resource type="Texture2D" uid="uid://detsilp12nioo" path="res://addons/compositor-lens-flare/lens-dirt.png" id="1_v4on2"]
